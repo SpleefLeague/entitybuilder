@@ -24,14 +24,6 @@
       </plugin>
     </plugins>
   </build>
-  <dependencies>
-    <dependency>
-      <groupId>org.mongodb</groupId>
-      <artifactId>mongo-java-driver</artifactId>
-      <version>3.2.2</version>
-      <scope>provided</scope>
-    </dependency>
-  </dependencies>
   <distributionManagement>
     <repository>
       <id>ssh-repository</id>
