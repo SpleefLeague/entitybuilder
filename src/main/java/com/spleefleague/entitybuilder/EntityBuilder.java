@@ -254,63 +254,11 @@ public class EntityBuilder {
                 try {
                     Field f = super.field;
                     Object o = f.get(instance);
-                    if (o == null) {
-                        return null;
+                    Class<? extends TypeConverter> tcc = f.getAnnotation(DBSave.class).typeConverter();
+                    if(tcc == TypeConverter.class) {
+                        tcc = null;
                     }
-                    if (o.getClass().isEnum()) {
-                        o = o.toString();
-                    } else if (o.getClass().isArray()) {
-                        List list = new ArrayList<>();
-                        Object[] array = (Object[]) o;
-                        if (!f.getAnnotation(DBSave.class).typeConverter().equals(TypeConverter.class)) {
-                            TypeConverter tc = f.getAnnotation(DBSave.class).typeConverter().newInstance();
-                            for (Object value : array) {
-                                list.add(tc.convertSave(value));
-                            }
-                        } else {
-                            for (Object value : array) {
-                                if (DBSaveable.class.isAssignableFrom(f.getType().getComponentType())) {
-                                    value = serialize((DBSaveable) value).get("$set");
-                                }
-                                list.add(value);
-                            }
-                        }
-                        o = list;
-                    } else if (Collection.class.isAssignableFrom(f.getType())) {
-                        List list = new ArrayList<>();
-                        Collection col = (Collection) o;
-                        if (!f.getAnnotation(DBSave.class).typeConverter().equals(TypeConverter.class)) {
-                            TypeConverter tc = f.getAnnotation(DBSave.class).typeConverter().newInstance();
-                            for (Object value : col) {
-                                list.add(tc.convertSave(value));
-                            }
-                        } else {
-                            for (Object value : col) {
-                                Class c = f.getType().getComponentType();
-                                if (c == null) {
-                                    if (col.isEmpty()) {
-                                        c = Object.class;
-                                    } else {
-                                        c = Iterables
-                                                .get((Collection) o, 0)
-                                                .getClass();
-                                    }
-                                }
-
-                                if (DBSaveable.class.isAssignableFrom(c)) {
-                                    value = serialize((DBSaveable) value).get("$set");
-                                }
-                                list.add(value);
-                            }
-                        }
-                        o = list;
-                    } else if (!f.getAnnotation(DBSave.class).typeConverter().equals(TypeConverter.class)) {
-                        TypeConverter tc = f.getAnnotation(DBSave.class).typeConverter().newInstance();
-                        o = tc.convertSave(o);
-                    } else if (DBSaveable.class.isAssignableFrom(f.getType())) {
-                        o = serialize((DBSaveable) o).get("$set");
-                    }
-                    return o;
+                    return parseObject(o, tcc);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -321,60 +269,68 @@ public class EntityBuilder {
                 try {
                     Method m = super.method;
                     Object o = m.invoke(instance);
-                    if (o == null) {
-                        return null;
+                    Class<? extends TypeConverter> tcc = m.getAnnotation(DBSave.class).typeConverter();
+                    if(tcc == TypeConverter.class) {
+                        tcc = null;
                     }
-                    if (m.getReturnType().isEnum()) {
-                        o = o.toString();
-                    } else if (m.getReturnType().isArray()) {
-                        List list = new ArrayList<>();
-                        Object[] array = (Object[]) o;
-                        if (!m.getAnnotation(DBSave.class).typeConverter().equals(TypeConverter.class)) {
-                            TypeConverter tc = m.getAnnotation(DBSave.class).typeConverter().newInstance();
-                            for (Object value : array) {
-                                list.add(tc.convertSave(value));
-                            }
-                        } else {
-                            for (Object value : array) {
-                                if (DBSaveable.class.isAssignableFrom(m.getReturnType().getComponentType())) {
-                                    value = serialize((DBSaveable) value).get("$set");
-                                }
-                                list.add(value);
-                            }
-                        }
-                        o = list;
-                    } else if (Collection.class.isAssignableFrom(m.getReturnType())) {
-                        List list = new ArrayList<>();
-                        Collection col = (Collection) o;
-                        Class generic = Object.class;
-                        if (m.getReturnType().getGenericInterfaces().length > 0) {
-                            generic = m.getReturnType().getGenericInterfaces()[0].getClass();
-                        }
-                        if (!m.getAnnotation(DBSave.class).typeConverter().equals(TypeConverter.class)) {
-                            TypeConverter tc = m.getAnnotation(DBSave.class).typeConverter().newInstance();
-                            for (Object value : col) {
-                                list.add(tc.convertSave(value));
-                            }
-                        } else {
-                            for (Object value : col) {
-                                if (DBSaveable.class.isAssignableFrom(generic)) {
-                                    value = serialize((DBSaveable) value).get("$set");
-                                }
-                                list.add(value);
-                            }
-                        }
-                        o = list;
-                    } else if (!m.getAnnotation(DBSave.class).typeConverter().equals(TypeConverter.class)) {
-                        TypeConverter tc = m.getAnnotation(DBSave.class).typeConverter().newInstance();
-                        o = tc.convertSave(o);
-                    } else if (DBSaveable.class.isAssignableFrom(m.getReturnType())) {
-                        o = serialize((DBSaveable) o).get("$set");
-                    }
-                    return o;
+                    return parseObject(o, tcc);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
                 return null;
+            }
+            
+            private Object parseObject(Object o, Class<? extends TypeConverter> tcc) throws InstantiationException, IllegalAccessException {
+                if (o == null) {
+                    return null;
+                }
+                if (o.getClass().isEnum()) {
+                    o = o.toString();
+                } else if (o.getClass().isArray()) {
+                    List list = new ArrayList<>();
+                    Object[] array = (Object[]) o;
+                    if (tcc != null) {
+                        TypeConverter tc = tcc.newInstance();
+                        for (Object value : array) {
+                            list.add(tc.convertSave(value));
+                        }
+                    } else {
+                        for (Object value : array) {
+                            if (DBSaveable.class.isAssignableFrom(value.getClass().getComponentType())) {
+                                value = serialize((DBSaveable) value).get("$set");
+                            }
+                            list.add(value);
+                        }
+                    }
+                    o = list;
+                } else if (Collection.class.isAssignableFrom(o.getClass())) {
+                    List list = new ArrayList<>();
+                    Collection col = (Collection) o;
+                    if (tcc != null) {
+                        TypeConverter tc = tcc.newInstance();
+                        for (Object value : col) {
+                            list.add(tc.convertSave(value));
+                        }
+                    } else {
+                        for (Object value : col) {
+                            Class c = value.getClass();
+                            if (DBSaveable.class.isAssignableFrom(c)) {
+                                value = serialize((DBSaveable) value).get("$set");
+                            }
+                            else {
+                                value = parseObject(value, null);
+                            }
+                            list.add(value);
+                        }
+                    }
+                    o = list;
+                } else if (tcc != null) {
+                    TypeConverter tc = tcc.newInstance();
+                    o = tc.convertSave(o);
+                } else if (DBSaveable.class.isAssignableFrom(o.getClass())) {
+                    o = serialize((DBSaveable) o).get("$set");
+                }
+                return o;
             }
         }
 
@@ -395,7 +351,7 @@ public class EntityBuilder {
                     setMethod(instance, value);
                 }
             }
-
+            
             private void setField(Object instance, Object value) {
                 try {
                     Field f = super.field;
@@ -475,6 +431,8 @@ public class EntityBuilder {
                         o = tc.convertLoad(o);
                     } else if (o instanceof Document && DBLoadable.class.isAssignableFrom(type)) {
                         o = deserialize((Document) o, type);
+                    } else if (type.isEnum() && o instanceof String) {
+                        o = Enum.valueOf((Class<Enum>) type, (String)o);
                     }
                     array[i] = o;
                 }
@@ -497,6 +455,8 @@ public class EntityBuilder {
                             o = deserialize(
                                     (Document) o, (Class<? extends DBLoadable>) ptype.getActualTypeArguments()[0]);
                         }
+                    } else if (((Class)ptype.getActualTypeArguments()[0]).isEnum() && o instanceof String) {
+                        o = Enum.valueOf((Class<Enum>) ptype.getActualTypeArguments()[0], (String)o);
                     }
                     col.add(o);
                 }
