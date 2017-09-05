@@ -69,14 +69,19 @@ public class EntityBuilder {
             Document set = new Document();
             Document unset = new Document();
             Document query = new Document();
-            for (String name : outputs.keySet()) {
-                Object o = outputs.get(name).get(object);
-                if (o != null) {
-                    set.put(name, o);
-                } else {
-                    unset.put(name, "");
-                }
-            }
+            outputs.entrySet()
+                    .stream()
+                    .sorted((e1, e2) -> e1.getValue().compareTo(e2.getValue()))
+                    .forEach(entry -> {
+                        String name = entry.getKey();
+                        Output out = entry.getValue();
+                        Object o = out.get(object);
+                        if (o != null) {
+                            set.put(name, o);
+                        } else {
+                            unset.put(name, "");
+                        }
+                    });
             query.put("$set", set);
             query.put("$unset", unset);
             return query;
@@ -98,15 +103,20 @@ public class EntityBuilder {
             } catch (InstantiationException | IllegalAccessException e) {
                 t = createInstance(c);
             }
+            final T instance = t;
             Map<String, Input> inputs = getInputs(c);
-            for (String name : inputs.keySet()) {
-                Object o = dbo.get(name);
-                if (o != null) {
-                    Input i = inputs.get(name);
-                    i.set(t, o);
-                }
-            }
-            ((DBLoadable) t).done();
+            inputs.entrySet()
+                    .stream()
+                    .sorted((e1, e2) -> e1.getValue().compareTo(e2.getValue()))
+                    .forEach(entry -> {
+                        String name = entry.getKey();
+                        Input i = entry.getValue();
+                        Object o = dbo.get(name);
+                        if (o != null) {
+                            i.set(instance, o);
+                        }
+                    });
+            ((DBLoadable) instance).done();
             return t;
         } catch (Exception e) {
             e.printStackTrace();
@@ -133,7 +143,6 @@ public class EntityBuilder {
             }
             current = current.getSuperclass();
         }
-        inputs = MapUtil.sortByValue(inputs);
         return inputs;
     }
 
@@ -156,7 +165,6 @@ public class EntityBuilder {
             }
             current = current.getSuperclass();
         }
-        outputs = MapUtil.sortByValue(outputs);
         return outputs;
     }
 
@@ -280,10 +288,15 @@ public class EntityBuilder {
                             for (Object value : col) {
                                 Class c = f.getType().getComponentType();
                                 if (c == null) {
-                                    c = Iterables
-                                            .getOnlyElement((Collection) o, null)
-                                            .getClass(); //Dangerous, but if this doesn't work, nothing does.
+                                    if (col.isEmpty()) {
+                                        c = Object.class;
+                                    } else {
+                                        c = Iterables
+                                                .get((Collection) o, 0)
+                                                .getClass();
+                                    }
                                 }
+
                                 if (DBSaveable.class.isAssignableFrom(c)) {
                                     value = serialize((DBSaveable) value).get("$set");
                                 }
@@ -442,8 +455,8 @@ public class EntityBuilder {
                     } else if (!m.getAnnotation(DBLoad.class).typeConverter().equals(TypeConverter.class)) {
                         TypeConverter tc = m.getAnnotation(DBLoad.class).typeConverter().newInstance();
                         m.invoke(instance, tc.convertLoad(value));
-                    } else if (value instanceof Document &&
-                               DBLoadable.class.isAssignableFrom(m.getParameterTypes()[0])) {
+                    } else if (value instanceof Document
+                            && DBLoadable.class.isAssignableFrom(m.getParameterTypes()[0])) {
                         m.invoke(instance, deserialize((Document) value, m.getParameterTypes()[0]));
                     } else {
                         m.invoke(instance, value);
