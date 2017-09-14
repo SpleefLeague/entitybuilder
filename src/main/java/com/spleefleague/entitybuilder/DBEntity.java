@@ -19,8 +19,4 @@ public abstract class DBEntity {
     public ObjectId getObjectId() {
         return _id;
     }
-
-    public void onDone() {
-
-    }
 }
