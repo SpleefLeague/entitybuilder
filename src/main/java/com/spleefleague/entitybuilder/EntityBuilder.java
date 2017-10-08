@@ -296,7 +296,8 @@ public class EntityBuilder {
                         }
                     } else {
                         for (Object value : array) {
-                            if (DBSaveable.class.isAssignableFrom(value.getClass().getComponentType())) {
+                            if(value == null) continue;
+                            if (DBSaveable.class.isAssignableFrom(value.getClass())) {
                                 value = serialize((DBSaveable) value).get("$set");
                             }
                             list.add(value);
@@ -313,8 +314,8 @@ public class EntityBuilder {
                         }
                     } else {
                         for (Object value : col) {
-                            Class c = value.getClass();
-                            if (DBSaveable.class.isAssignableFrom(c)) {
+                            if(value == null) continue;
+                            if (DBSaveable.class.isAssignableFrom(value.getClass())) {
                                 value = serialize((DBSaveable) value).get("$set");
                             }
                             else {

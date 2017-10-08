@@ -5,8 +5,19 @@
   <artifactId>entitybuilder</artifactId>
   <version>1.0</version>
   <build>
+    <extensions>
+      <extension>
+        <groupId>org.apache.maven.wagon</groupId>
+        <artifactId>wagon-ssh-external</artifactId>
+        <version>2.10</version>
+      </extension>
+    </extensions>
     <finalName>${project.artifactId}</finalName>
     <plugins>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.6.2</version>
+      </plugin>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
         <version>2.3</version>
