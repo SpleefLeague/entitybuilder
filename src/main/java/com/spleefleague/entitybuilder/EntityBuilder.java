@@ -378,6 +378,7 @@ public class EntityBuilder {
                     } else if (value instanceof Document && DBLoadable.class.isAssignableFrom(f.getType())) {
                         f.set(instance, deserialize((Document) value, f.getType()));
                     } else {
+                        value = rewrap(f.getType(), value);
                         f.set(instance, value);
                     }
                 } catch (Exception e) {
@@ -416,6 +417,7 @@ public class EntityBuilder {
                             && DBLoadable.class.isAssignableFrom(m.getParameterTypes()[0])) {
                         m.invoke(instance, deserialize((Document) value, m.getParameterTypes()[0]));
                     } else {
+                        value = rewrap(m.getParameterTypes()[0], value);
                         m.invoke(instance, value);
                     }
                 } catch (Exception e) {
@@ -435,6 +437,7 @@ public class EntityBuilder {
                     } else if (type.isEnum() && o instanceof String) {
                         o = Enum.valueOf((Class<Enum>) type, (String)o);
                     }
+                    o = rewrap(type, o);
                     array[i] = o;
                 }
                 return createGenericArray(array, type);
@@ -459,11 +462,43 @@ public class EntityBuilder {
                     } else if (((Class)ptype.getActualTypeArguments()[0]).isEnum() && o instanceof String) {
                         o = Enum.valueOf((Class<Enum>) ptype.getActualTypeArguments()[0], (String)o);
                     }
+                    o = rewrap((Class<?>) ptype.getActualTypeArguments()[0], o);
                     col.add(o);
                 }
                 return (T) col;
             }
-
+            
+            private static Object rewrap(Class<?> target, Object o) {
+                if(!(target.isPrimitive() || Number.class.isAssignableFrom(target)) || !(o instanceof Number)) {
+                    return o;
+                }
+                Number n = (Number)o;
+                if(target == long.class) {
+                    return n.longValue();
+                }
+                else if(target == int.class) {
+                    return n.intValue();
+                }
+                else if(target == short.class) {
+                    return n.shortValue();
+                }
+                else if(target == byte.class) {
+                    return n.byteValue();
+                }
+                else if(target == Long.class) {
+                    return (Long)n.longValue();
+                }
+                else if(target == Integer.class) {
+                    return (Integer)n.intValue();
+                }
+                else if(target == Short.class) {
+                    return (Short)n.shortValue();
+                }
+                else if(target == Byte.class) {
+                    return (Byte)n.byteValue();
+                }
+                throw new UnsupportedOperationException("Unknown number type: " + target.getClass());
+            }
             private static Object createGenericArray(Object[] values, Class<?> cast) {
                 Object array = Array.newInstance(cast, values.length);
                 if (!cast.isPrimitive()) {
