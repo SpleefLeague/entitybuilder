@@ -5,7 +5,6 @@
  */
 package com.spleefleague.entitybuilder;
 
-import com.google.common.collect.Iterables;
 import com.mongodb.client.MongoCollection;
 import com.spleefleague.entitybuilder.EntityBuilder.IOClass.Input;
 import com.spleefleague.entitybuilder.EntityBuilder.IOClass.Output;
@@ -64,31 +63,26 @@ public class EntityBuilder {
     }
 
     public static Document serialize(DBSaveable object) {
-        try {
-            HashMap<String, Output> outputs = getOutputs(object.getClass());
-            Document set = new Document();
-            Document unset = new Document();
-            Document query = new Document();
-            outputs.entrySet()
-                    .stream()
-                    .sorted((e1, e2) -> e1.getValue().compareTo(e2.getValue()))
-                    .forEach(entry -> {
-                        String name = entry.getKey();
-                        Output out = entry.getValue();
-                        Object o = out.get(object);
-                        if (o != null) {
-                            set.put(name, o);
-                        } else {
-                            unset.put(name, "");
-                        }
-                    });
-            query.put("$set", set);
-            query.put("$unset", unset);
-            return query;
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
+        HashMap<String, Output> outputs = getOutputs(object.getClass());
+        Document set = new Document();
+        Document unset = new Document();
+        Document query = new Document();
+        outputs.entrySet()
+                .stream()
+                .sorted((e1, e2) -> e1.getValue().compareTo(e2.getValue()))
+                .forEach(entry -> {
+                    String name = entry.getKey();
+                    Output out = entry.getValue();
+                    Object o = out.get(object);
+                    if (o != null) {
+                        set.put(name, o);
+                    } else {
+                        unset.put(name, "");
+                    }
+                });
+        query.put("$set", set);
+        query.put("$unset", unset);
+        return query;
     }
 
     public static <T extends DBEntity & DBLoadable> T load(Document dbo, Class<T> c) {
@@ -96,32 +90,27 @@ public class EntityBuilder {
     }
 
     public static <T> T deserialize(Document dbo, Class<T> c) {
+        T t = null;
         try {
-            T t = null;
-            try {
-                t = c.newInstance();
-            } catch (InstantiationException | IllegalAccessException e) {
-                t = createInstance(c);
-            }
-            final T instance = t;
-            Map<String, Input> inputs = getInputs(c);
-            inputs.entrySet()
-                    .stream()
-                    .sorted((e1, e2) -> e1.getValue().compareTo(e2.getValue()))
-                    .forEach(entry -> {
-                        String name = entry.getKey();
-                        Input i = entry.getValue();
-                        Object o = dbo.get(name);
-                        if (o != null) {
-                            i.set(instance, o);
-                        }
-                    });
-            ((DBLoadable) instance).done();
-            return t;
-        } catch (Exception e) {
-            e.printStackTrace();
+            t = c.newInstance();
+        } catch (InstantiationException | IllegalAccessException e) {
+            t = createInstance(c);
         }
-        return null;
+        final T instance = t;
+        Map<String, Input> inputs = getInputs(c);
+        inputs.entrySet()
+                .stream()
+                .sorted((e1, e2) -> e1.getValue().compareTo(e2.getValue()))
+                .forEach(entry -> {
+                    String name = entry.getKey();
+                    Input i = entry.getValue();
+                    Object o = dbo.get(name);
+                    if (o != null) {
+                        i.set(instance, o);
+                    }
+                });
+        ((DBLoadable) instance).done();
+        return t;
     }
 
     private static Map<String, Input> getInputs(Class c) {
@@ -261,8 +250,8 @@ public class EntityBuilder {
                     return parseObject(o, tcc);
                 } catch (Exception e) {
                     e.printStackTrace();
+                    throw new RuntimeException(e);
                 }
-                return null;
             }
 
             private Object getMethod(Object instance) {
@@ -276,8 +265,8 @@ public class EntityBuilder {
                     return parseObject(o, tcc);
                 } catch (Exception e) {
                     e.printStackTrace();
+                    throw new RuntimeException(e);
                 }
-                return null;
             }
             
             private Object parseObject(Object o, Class<? extends TypeConverter> tcc) throws InstantiationException, IllegalAccessException {
@@ -377,6 +366,8 @@ public class EntityBuilder {
                         f.set(instance, tc.convertLoad(value));
                     } else if (value instanceof Document && DBLoadable.class.isAssignableFrom(f.getType())) {
                         f.set(instance, deserialize((Document) value, f.getType()));
+                    } else if (value instanceof Document && Document.class.isAssignableFrom(f.getType())) {
+                        f.set(instance, value);
                     } else {
                         value = rewrap(f.getType(), value);
                         f.set(instance, value);
@@ -387,23 +378,24 @@ public class EntityBuilder {
                         fName = super.field.getName();
                     }
                     System.err.println("EntityBuilder failed setting field: " + instance.getClass().getName() + "." + fName);
-                    e.printStackTrace();
+                    throw new RuntimeException(e);
                 }
             }
 
             private void setMethod(Object instance, Object value) {
                 try {
                     Method m = super.method;
-                    if (m.getParameterTypes()[0].isEnum() && value instanceof String) {
-                        m.invoke(instance, Enum.valueOf((Class<Enum>) m.getParameterTypes()[0], (String) value));
+                    Class<?> ptype = m.getParameterTypes()[0];
+                    if (ptype.isEnum() && value instanceof String) {
+                        m.invoke(instance, Enum.valueOf((Class<Enum>) ptype, (String) value));
                     } else if (m.getParameterTypes()[0].isArray() && value instanceof List) {
                         List list = (List) value;
                         m.invoke(
-                                instance, loadArray(list, m.getParameterTypes()[0].getComponentType(),
+                                instance, loadArray(list, ptype.getComponentType(),
                                         m.getAnnotation(DBLoad.class).typeConverter()
                                 ));
-                    } else if (Collection.class.isAssignableFrom(m.getParameterTypes()[0]) && value instanceof List) {
-                        Class c = m.getParameterTypes()[0];
+                    } else if (Collection.class.isAssignableFrom(ptype) && value instanceof List) {
+                        Class c = ptype;
                         List list = (List) value;
                         Collection col = loadCollection(
                                 list, c, (ParameterizedType) m.getGenericParameterTypes()[0],
@@ -414,14 +406,21 @@ public class EntityBuilder {
                         TypeConverter tc = m.getAnnotation(DBLoad.class).typeConverter().newInstance();
                         m.invoke(instance, tc.convertLoad(value));
                     } else if (value instanceof Document
-                            && DBLoadable.class.isAssignableFrom(m.getParameterTypes()[0])) {
-                        m.invoke(instance, deserialize((Document) value, m.getParameterTypes()[0]));
+                            && DBLoadable.class.isAssignableFrom(ptype)) {
+                        m.invoke(instance, deserialize((Document) value, ptype));
+                    } else if (value instanceof Document && Document.class.isAssignableFrom(ptype)) {
+                        m.invoke(instance, value);
                     } else {
-                        value = rewrap(m.getParameterTypes()[0], value);
+                        value = rewrap(ptype, value);
                         m.invoke(instance, value);
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    String mName = "<unknown>";
+                    if (super.method != null) {
+                        mName = super.method.getName();
+                    }
+                    System.err.println("EntityBuilder failed setting method: " + instance.getClass().getName() + "." + mName);
+                    throw new RuntimeException(e);
                 }
             }
 

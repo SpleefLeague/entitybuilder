@@ -19,4 +19,8 @@ public abstract class DBEntity {
     public ObjectId getObjectId() {
         return _id;
     }
+    
+    public void setObjectId(ObjectId _id) {
+        this._id = _id;
+    }
 }
