@@ -207,7 +207,14 @@ public class EntityBuilder {
         public int getPriority() {
             return priority;
         }
-
+        
+        @Override
+        public String toString() {
+            String target = isField() ? field.toString() : method.toString();
+            String prefix = isField() ? "field" : "method";
+            return "Input{" + prefix + "=" + target + ", priority=" + priority + "}";
+        }
+        
         @Override
         public int compareTo(IOClass o) {
             if (priority > o.getPriority()) {

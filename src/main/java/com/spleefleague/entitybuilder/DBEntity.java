@@ -13,7 +13,7 @@ import org.bson.types.ObjectId;
  */
 public abstract class DBEntity {
 
-    @DBLoad(fieldName = "_id")
+    @DBLoad(fieldName = "_id", priority = Integer.MAX_VALUE)
     private ObjectId _id;
 
     public ObjectId getObjectId() {
