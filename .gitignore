@@ -4,7 +4,7 @@ bin/
 .project
 .settings/
 /src/main/java/com/spleefleague/core/debuggers/
-SpleefLeagueCore.iml
+*.iml
 .idea/
 nb-configuration.xml
 nbactions.xml

@@ -491,17 +491,29 @@ public class EntityBuilder {
                 else if(target == byte.class) {
                     return n.byteValue();
                 }
+                else if(target == float.class) {
+                    return n.floatValue();
+                }
+                else if(target == double.class) {
+                    return n.doubleValue();
+                }
                 else if(target == Long.class) {
-                    return (Long)n.longValue();
+                    return n.longValue();
                 }
                 else if(target == Integer.class) {
-                    return (Integer)n.intValue();
+                    return n.intValue();
                 }
                 else if(target == Short.class) {
-                    return (Short)n.shortValue();
+                    return n.shortValue();
                 }
                 else if(target == Byte.class) {
-                    return (Byte)n.byteValue();
+                    return n.byteValue();
+                }
+                else if(target == Float.class) {
+                    return n.floatValue();
+                }
+                else if(target == Double.class) {
+                    return n.doubleValue();
                 }
                 throw new UnsupportedOperationException("Unknown number type: " + target.getClass());
             }
